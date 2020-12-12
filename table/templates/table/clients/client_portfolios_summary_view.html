@@ -1,0 +1,31 @@
+{% load static %}
+<link rel="stylesheet" href="{% static 'table/client_portfolio_view.css'%}">
+
+<div style="width: 100%;">
+    <div class="row justify-content-md-center">
+        <div class="table-wrapper-scroll-y portfolio-scroll">
+            <table class="table table-bordered table-striped portfolio-table" style="background-color: whitesmoke;">
+                <thead>
+                    <tr>       
+                        <th style="width: 10%;">Portfolio</th>
+                        <th style="width: 10%;">Value</th>
+                        <th style="width: 10%;">YTD %</th>
+                        <th style="width: 60%;">Description</th>
+                        <th style="width: 10%;">Display</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for portfolio in portfolios %}
+                        <tr style="text-align: center;">
+                            <td>{{ portfolio.name }}</td>
+                            <td>${{ portfolio.current_value }}</td>
+                            <td>{{ portfolio.ytd_perc_change }}</td>
+                            <td>{{ portfolio.description}}</td>
+                            <td>Display</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

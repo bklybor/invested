@@ -1,0 +1,46 @@
+.portfolio-scroll {
+    position: relative;
+    align-content: left;
+    border-style: outset;
+    height: auto;
+    width: 90%;
+    overflow: auto;
+}
+
+.portfolio-table thead tr th{
+    font-size: 12pt;
+    text-align: center;
+}
+
+tr td{
+    padding: 0 !important;
+    padding: 0 !important;
+}
+
+tr th{
+    padding: 0 !important;
+    padding: 0 !important;
+}
+
+.table-wrapper-scroll-y {
+    display: block;
+}
+
+.widget-box{
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    margin: auto;
+    height: 250px;
+    width: 90%;
+}
+
+.btn-minimize {
+    width: 80px;
+    height: 50px;
+    background-color: #ffffff;
+}
+.btn-minimize.btn-plus {
+    background-color: #ffffff;
+}

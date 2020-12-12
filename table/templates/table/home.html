@@ -1,0 +1,18 @@
+{% extends 'base.html' %}
+{% load crispy_forms_tags %}
+{% load templatetags %}
+{% csrf_token %}
+{% crispy form %}
+{% block content %}
+
+{% if user.is_authenticated %}
+    {% if user.is_client %}
+        {% include './clients/client_view.html' with portfolios=portfolios market_data=market_data%}
+    {% elif user.is_broker %}
+        {% include './brokers/broker_view.html'%}
+    {% else %}
+        {% include './guests/guest_view.html' %}
+    {% endif %}
+{% endif %}
+
+{% endblock %}

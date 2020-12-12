@@ -1,0 +1,47 @@
+{% extends './client_base.html' %}
+{% load crispy_forms_tags %}
+{% load templatetags %}
+{% csrf_token %}
+{% crispy form %}
+{% load static %}
+{% block clientContent %}
+
+<link rel="stylesheet" href="{% static 'table/client_portfolio_view.css'%}">
+<h2>'{{ portfolio_name }}' portfolio</h2>
+
+<div class="widget-box">
+    <div class="table-wrapper-scroll-y portfolio-scroll">
+        <table class="table table-bordered table-striped mb-0 portfolio-table" style="background-color: whitesmoke;">
+            <thead>
+                <tr style="text-align: center;">       
+                    <th scope="col">Exchange</th>
+                    <th scope="col">Ticker</th>
+                    <th scope="col">Price</th>
+                    <th scope="col">Type</th>
+                    <th scope="col">Date</th>
+                    <th scope="col">Quantity</th>
+                    <th scope="col">Remaining Shares</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for portfolio in portfolios %}
+                    {% if portfolio.name == portfolio_name %}
+                        {% for transaction in portfolio.stocktransactions.all %}
+                        <tr style="text-align: center;">
+                            <td>{{ transaction.exchange_abbr}}</td>
+                            <td>{{ transaction.ticker }}</td>
+                            <td>{{ transaction.price }}</td>
+                            <td>{{ transaction.transaction_type }}</td>
+                            <td>{{ transaction.date }}</td>
+                            <td>{{ transaction.quantity }}</td>
+                            <td>{{ transaction.remaining_shares }}</td>
+                        </tr>
+                        {% endfor%}
+                    {% endif%}
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% endblock %}

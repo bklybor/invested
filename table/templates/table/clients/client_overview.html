@@ -1,0 +1,24 @@
+{% extends './client_base.html' %}
+{% load crispy_forms_tags %}
+{% csrf_token %}
+{% crispy form %}
+{% block clientContent %}
+{% load static %}
+
+<div class="widget-box">
+    {% include './client_small_market_view.html' with market_data=market_data%}
+</div>
+
+<button class="btn-minimize">Portfolios</button>
+<div id='portfolio_summary' class="widget-box">
+    {% include './client_portfolios_summary_view.html' with portfolios=portfolios %}
+</div>
+
+
+<script>
+    $(".btn-minimize").click(function(){
+    $(this).toggleClass('btn-plus');
+    $("#portfolio_summary").slideToggle();
+    });
+</script>
+{% endblock %}

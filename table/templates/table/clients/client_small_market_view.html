@@ -1,0 +1,168 @@
+{% load static %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.1/moment.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@2.9.4/dist/Chart.min.js"></script>
+<!-- Import D3 Scale Chromatic via CDN -->
+<script src="https://d3js.org/d3-color.v1.min.js"></script>
+<script src="https://d3js.org/d3-interpolate.v1.min.js"></script>
+<script src="https://d3js.org/d3-scale-chromatic.v1.min.js"></script>
+
+
+<canvas id="stock-chart"></canvas>
+
+<script>
+    var dateFormat = 'YYYY-MM-DD';
+    var None = null;
+
+    function parseDate(date){
+        var parts = date.split("-");
+        return new Date(parts[0], parts[1] - 1, parts[2])
+    };
+
+    function calculatePoint(i, intervalSize, colorRangeInfo) {
+        var { colorStart, colorEnd, useEndAsStart } = colorRangeInfo;
+        return (useEndAsStart
+            ? (colorEnd - (i * intervalSize))
+            : (colorStart + (i * intervalSize)));
+    }
+
+    /* Must use an interpolated color scale, which has a range of [0, 1] */
+    function interpolateColors(dataLength, colorScale, colorRangeInfo) {
+        var { colorStart, colorEnd } = colorRangeInfo;
+        var colorRange = colorEnd - colorStart;
+        var intervalSize = colorRange / dataLength;
+        var i, colorPoint;
+        var colorArray = [];
+
+        for (i = 0; i < dataLength; i++) {
+            colorPoint = calculatePoint(i, intervalSize, colorRangeInfo);
+            colorArray.push(colorScale(colorPoint));
+        }
+
+        return colorArray;
+    };
+
+    const colorRangeInfo = {
+        colorStart: 0,
+        colorEnd: 1,
+        useEndAsStart: false
+    };
+
+    var COLORS = interpolateColors({{market_data.0|safe}}.length, d3.interpolateInferno, colorRangeInfo);
+
+    var dates = {{ market_data.1|safe }}.map(dateString =>parseDate(dateString));
+
+    const _MS_PER_DAY = 1000 * 60 * 60 * 24;
+    
+    function dateDiffInDays(startDate, endDate) {
+        // Discard the time and time-zone information.
+        const utc1 = Date.UTC(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+        const utc2 = Date.UTC(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
+
+        return Math.floor((utc2 - utc1) / _MS_PER_DAY);
+    };
+
+    Chart.defaults.LineWithLine = Chart.defaults.line;
+    Chart.controllers.LineWithLine = Chart.controllers.line.extend({
+        draw: function(ease) {
+            Chart.controllers.line.prototype.draw.call(this, ease);
+
+            if (this.chart.tooltip._active && this.chart.tooltip._active.length) {
+                var activePoint = this.chart.tooltip._active[0],
+                    ctx = this.chart.ctx,
+                    x = activePoint.tooltipPosition().x,
+                    topY = this.chart.legend.bottom,
+                    bottomY = this.chart.chartArea.bottom;
+
+                // draw line
+                ctx.save();
+                ctx.beginPath();
+                ctx.moveTo(x, topY);
+                ctx.lineTo(x, bottomY);
+                ctx.lineWidth = 1;
+                ctx.strokeStyle = '#07C';
+                ctx.stroke();
+                ctx.restore();
+            }
+        }
+    });
+
+    var config = {
+        type: 'LineWithLine',
+        data: {
+            labels: dates,
+            datasets: [
+                {% for prices in market_data.0 %}
+                    {
+                        label: "{{ prices.0|safe }}",
+                        backgroundColor: COLORS[{{ forloop.counter0 }}],
+                        borderColor: COLORS[{{ forloop.counter0 }}],
+                        data: {{ prices|slice:"1:"|safe }},
+                        fill: false,
+                        borderWidth: 2
+                    },
+                {% endfor %}
+            ],
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            spanGaps: true,
+            title:{
+                text: 'Market',
+                display: false
+            },
+            scales: {
+                xAxes:[{
+                    type: 'time',
+                    time:{
+                        unit: 'day',
+                        unitStepSize: dateDiffInDays(dates[0], dates[dates.length-1]),
+                        displayFormats:{
+                            'day': 'YYYY-MM-DD'
+                        }
+                    }
+                }],
+                yAxes: [{
+                    ticks: {
+                        min: -1,
+                        max: 1,
+                        callback: function(value){
+                            return value * 100 + "%"
+                        }
+                    },
+                    scaleLabel: {
+                        display: true,
+                        labelString: "Percentage"
+                    }
+                }]
+            },
+            elements:{
+                point:{
+                    radius: 0
+                },
+                line: {
+                    tension: 0
+                }
+            },
+            tooltips: {
+                enabled: true,
+                mode: 'single',
+                callbacks: {
+                    label: function(tooltipItems, data){
+                        var label = data.datasets[tooltipItems.datasetIndex].label || '';
+
+                        if(label){
+                            label = label + ': ' + tooltipItems.yLabel.toFixed(4) * 100 + '%'
+                        }
+
+                        return label
+                    }
+                }
+            }
+        }
+    };
+
+    var ctx = document.getElementById('stock-chart');
+    var chart = new Chart(ctx, config);
+
+</script>
