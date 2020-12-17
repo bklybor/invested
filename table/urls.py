@@ -7,7 +7,6 @@ urlpatterns = [
     path('', table.home, name= 'home'),
     
     path('client/', include(([
-        
         path('overview/', client.ClientOverview.as_view(), name= 'client_home_view'),
         path('portfolios/<portfolio_name>', client.ClientPortfolioView.as_view(), name='client_portfolio_view')
     ], 'table'), namespace= 'client')),

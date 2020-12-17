@@ -50,6 +50,58 @@
     var COLORS = interpolateColors({{market_data.0|safe}}.length, d3.interpolateInferno, colorRangeInfo);
 
     var dates = {{ market_data.1|safe }}.map(dateString =>parseDate(dateString));
+    var price_lists = {{ market_data.0|safe }};
+
+    function calc_per_change_zeroed(start_num, end_num){
+        return (end_num/start_num) - 1;
+    };
+
+    function percent_zeroed_data(data){
+        let numbersOnly = (val) => {
+            if (typeof(val) === 'number') {
+                return val
+            } 
+        }
+        let prices = data.filter(numbersOnly);
+        let start_price = prices[0];
+        //console.log(dates[0], prices[0]);
+        //console.log(prices[prices.length-1]);
+        let percentized = []
+        for(let i = 0; i < data.length; i++){
+            if(data[i]){
+                percentized.push(calc_per_change_zeroed(start_price, data[i]));
+            }else{
+                percentized.push(None);
+            }
+        }
+        //console.log(percentized);
+        return percentized;
+    };
+
+    function get_perc_bounds() {
+        let numbersOnly = (val) => {
+            if (typeof(val) === 'number') {
+                return val
+            } 
+        }
+        let max_perc = 0;
+        let min_perc = 0;
+        let len = price_lists.length;
+        for(let i = 0; i < len; i++) {
+            let prices = percent_zeroed_data(price_lists[i]).filter(numbersOnly);
+            let start_price = prices[0];
+
+            if(Math.max(...prices) > max_perc){
+                max_perc = Math.max(...prices);
+            }
+
+            if(Math.min(...prices) < min_perc){
+                min_perc = Math.min(...prices);
+            }
+        }
+        return [min_perc, max_perc]
+    };
+
 
     const _MS_PER_DAY = 1000 * 60 * 60 * 24;
     
@@ -86,6 +138,8 @@
         }
     });
 
+    var test = percent_zeroed_data(price_lists[0].slice(1,-1));
+
     var config = {
         type: 'LineWithLine',
         data: {
@@ -93,10 +147,10 @@
             datasets: [
                 {% for prices in market_data.0 %}
                     {
-                        label: "{{ prices.0|safe }}",
+                        label: price_lists[{{ forloop.counter0 }}][0],
                         backgroundColor: COLORS[{{ forloop.counter0 }}],
                         borderColor: COLORS[{{ forloop.counter0 }}],
-                        data: {{ prices|slice:"1:"|safe }},
+                        data: percent_zeroed_data(price_lists[{{ forloop.counter0 }}].slice(1,-1)),
                         fill: false,
                         borderWidth: 2
                     },
@@ -116,19 +170,23 @@
                     type: 'time',
                     time:{
                         unit: 'day',
-                        unitStepSize: dateDiffInDays(dates[0], dates[dates.length-1]),
+                        unitStepSize: 1,
                         displayFormats:{
                             'day': 'YYYY-MM-DD'
                         }
+                    },
+                    ticks:{
+                        maxTicksLimit: 20
                     }
                 }],
                 yAxes: [{
                     ticks: {
-                        min: -1,
-                        max: 1,
+                        min: get_perc_bounds()[0],
+                        max: get_perc_bounds()[1],
                         callback: function(value){
-                            return value * 100 + "%"
-                        }
+                            return (value * 100).toFixed(2) + "%"
+                        },
+                        maxTicksLimit: 5
                     },
                     scaleLabel: {
                         display: true,
@@ -152,7 +210,7 @@
                         var label = data.datasets[tooltipItems.datasetIndex].label || '';
 
                         if(label){
-                            label = label + ': ' + tooltipItems.yLabel.toFixed(4) * 100 + '%'
+                            label = label + ': ' + (tooltipItems.yLabel * 100).toFixed(4) + '%'
                         }
 
                         return label

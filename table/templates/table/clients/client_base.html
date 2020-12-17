@@ -1,9 +1,13 @@
 {% extends 'base.html' %}
 {% load crispy_forms_tags %}
+{% load templatetags%}
+
 {% csrf_token %}
 {% crispy form %}
 
 {% block content %}
+{% get_portfolios user as portfolios %}
+<h1></h1>
 {% include './client_navbar.html' with portfolios=portfolios%}
 <div id="clientContent">
     {% block clientContent %}

@@ -43,10 +43,11 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'settings.apps.SettingsConfig',
     'crispy_forms',
     'rest_framework',
     'table.apps.TableConfig',
-    'home.apps.HomeConfig'
+    'home.apps.HomeConfig',
 ]
 
 MIDDLEWARE = [
@@ -74,6 +75,9 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'settings.context_processors.site_settings',
+                'settings.context_processors.stock_management_settings',
+                'settings.context_processors.company_settings'
             ],
             'libraries':{
                 'templatetags': 'templatetags.tags',

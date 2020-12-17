@@ -18,7 +18,7 @@
                     {% for portfolio in portfolios %}
                         <tr style="text-align: center;">
                             <td>{{ portfolio.name }}</td>
-                            <td>${{ portfolio.current_value }}</td>
+                            <td id= '{{ portfolio.name }}_portfolio_value'></td>
                             <td>{{ portfolio.ytd_perc_change }}</td>
                             <td>{{ portfolio.description}}</td>
                             <td>Display</td>
@@ -29,3 +29,9 @@
         </div>
     </div>
 </div>
+<script>
+    var values = [];
+    {% for portfolio in portfolios %}
+    document.getElementById('{{ portfolio.name }}_portfolio_value').innerHTML = '$' + (Math.round({{portfolio.get_value|safe }} * 100) / 100).toFixed(2);
+    {% endfor %}
+</script>

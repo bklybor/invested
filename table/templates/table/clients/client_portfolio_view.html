@@ -18,30 +18,51 @@
                     <th scope="col">Ticker</th>
                     <th scope="col">Price</th>
                     <th scope="col">Type</th>
-                    <th scope="col">Date</th>
                     <th scope="col">Quantity</th>
-                    <th scope="col">Remaining Shares</th>
+                    <th scope="col">Order Value</th>
+                    <th scope="col">Order Placement Datetime</th>
+                    <th scope="col">Order Execution Datetime</th>
+                    <th scope="col">Total Value</th>
                 </tr>
             </thead>
-            <tbody>
-                {% for portfolio in portfolios %}
-                    {% if portfolio.name == portfolio_name %}
-                        {% for transaction in portfolio.stocktransactions.all %}
-                        <tr style="text-align: center;">
-                            <td>{{ transaction.exchange_abbr}}</td>
-                            <td>{{ transaction.ticker }}</td>
-                            <td>{{ transaction.price }}</td>
-                            <td>{{ transaction.transaction_type }}</td>
-                            <td>{{ transaction.date }}</td>
-                            <td>{{ transaction.quantity }}</td>
-                            <td>{{ transaction.remaining_shares }}</td>
-                        </tr>
-                        {% endfor%}
-                    {% endif%}
-                {% endfor %}
+            <tbody>       
+                {% for transaction in portfolio.stocktransactions.all %}
+                <tr style="text-align: center;">
+                    <td>{{ transaction.exchange_abbr}}</td>
+                    <td>{{ transaction.ticker }}</td>
+                    <td id='{{ forloop.counter0 }}_price'>{{ transaction.price }}</td>
+                    <td>{{ transaction.order_type }}</td>
+                    <td>{{ transaction.quantity }}</td>
+                    <td id='{{ forloop.counter0 }}_value'></td>
+                    <td>{{ transaction.order_placement_datetime }}</td>
+                    <td>{{ transaction.order_execution_datetime }}</td>
+                    <td id= '{{ forloop.counter0 }}_total_value'></td>
+                </tr>
+                {% endfor%}         
             </tbody>
         </table>
     </div>
 </div>
+<script>
+    var prices = {{ portfolio.get_stocks_info.0|safe }};
+    var quantities = {{ portfolio.get_stocks_info.1|safe }};
+    var values = {{ portfolio.get_stocks_info.2|safe }};
+    var types = {{ portfolio.get_stocks_info.3|safe }};
 
+    var total_stock_value = 0;
+    for(i=0; i < prices.length;i++){
+        document.getElementById( i + '_price').innerHTML = '$' + (Math.round(prices[i] * 100) / 100).toFixed(2);
+        document.getElementById( i + '_value').innerHTML = '$' + (Math.round(values[i] * 100) / 100).toFixed(2);
+        document.getElementById( i + '_value').innerHTML = '$' + (Math.round(values[i] * 100) / 100).toFixed(2);
+        if(types[i] == 'buy'){
+            total_stock_value += values[i];
+        } else if(types[i] == 'sell'){
+            total_stock_value -= values[i];
+        }
+        
+        document.getElementById( i + '_total_value').innerHTML = '$' + (Math.round((total_stock_value) * 100) / 100).toFixed(2);
+    }
+    
+
+</script>
 {% endblock %}

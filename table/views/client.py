@@ -3,6 +3,7 @@ from datetime import datetime
 import pytz
 from decimal import Decimal
 import pandas as pd
+import numpy as np
 
 from django.contrib import messages
 from django.contrib.auth import login
@@ -13,7 +14,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse_lazy, reverse
 from django.utils.decorators import method_decorator
 from django.views.generic import CreateView, ListView, UpdateView, View, TemplateView
-from django.http import JsonResponse
+from django.http import JsonResponse, Http404
 
 from home.decorators import client_required
 from ..forms import PortfolioCreationForm
@@ -43,8 +44,7 @@ class ClientOverview(TemplateView):
 
     def get_context_data(self, **kwargs):
         context = super(ClientOverview, self).get_context_data(**kwargs)
-        context['portfolios'] = self.get_portfolio_queryset()
-        context['market_data'] = Stock.get_stocks_data(dates=['2000-01-01', '2010-02-01'], tickers=['^DJI', '^GSPC', '^IXIC'])
+        context['market_data'] = Stock.get_stocks_data(dates=['2000-01-01', '2020-01-01'], tickers=['^DJI', '^GSPC', '^IXIC', 'IBM'])
         return context
 
 
@@ -53,7 +53,20 @@ class ClientPortfolioView(TemplateView):
     '''Detailed view of a given portfolio.'''
     template_name = 'table/clients/client_portfolio_view.html'
 
+    def get_portfolio(self, test_name):
+        names = list(self.request.user.portfolios.all().values_list('name'))
+        names_list = [item[0] for item in names]
+        portfolio = None
+        if test_name in names_list:
+            portfolio = self.request.user.portfolios.get(name= test_name)
+        else:
+            raise Http404
+
+        return portfolio
+
     def get_context_data(self, **kwargs):
         context = super(ClientPortfolioView, self).get_context_data(**kwargs)
-        context['portfolios'] = self.request.user.client.portfolios.all()
+        context['portfolio'] = self.get_portfolio(context['portfolio_name'])
+        
         return context
+
