@@ -18,9 +18,11 @@ decimal_places = 6
 date_format = '%Y-%m-%d %H:%M:%S'
 
 site_settings = SiteSettings.objects.all()[0]
-stock_managment_settings = list(StockManagementSettings.objects.values())[0]
-stock_managment_settings.pop('id') # dictionary of settings
+stock_management_settings = StockManagementSettings.objects.all()[0]
+
 company = Company.objects.all()[0]
+
+
 
 class Portfolio(Model):
     """A model representing a portfolio for a given client.
@@ -248,6 +250,8 @@ class StockTransactRecord(Model):
     :type quantity: PositiveInteger
     """
 
+    decision_table = None
+
     class TRANSACTION_TYPE(Enum):
         buy = ('buy', 'Stock buy order.')
         sell = ('sell', 'Stock sell order.')
@@ -261,6 +265,7 @@ class StockTransactRecord(Model):
         rejected = ('rejected', 'Order cannot be processed.')
         processing = ('processing', 'Order is currently processing.')
         under_review = ('under_review', 'Order is currently under review.')
+        completed = ('completed', 'Order has been completed')
 
         @classmethod
         def get_value(cls, member):
@@ -328,7 +333,7 @@ class StockTransactRecord(Model):
         null= True
     )
     transaction_id = UUIDField(default=uuid.uuid4, editable=False)
-
+        
     def __str__(self):
         return str(self.timestamp)
 
@@ -342,164 +347,24 @@ class StockTransactRecord(Model):
     def get_value(self):
         return self.price * self.quantity
 
-'''@receiver(post_save, sender= StockTransactRecord, dispatch_uid= 'stock_transaction_post_save')
-def stock_transaction_post_save(sender, instance, **kwargs):
-    if instance.order_status == StockTransactRecord.STATUS.approved.name:
-        sign = 0
-        if instance.order_type == StockTransactRecord.TRANSACTION_TYPE.buy.name:
-            print('(Taking cash from portfolio to cover buy order.)')
-            sign = -1
-        if instance.order_type == StockTransactRecord.TRANSACTION_TYPE.sell.name:
-            print('(Depositing cash from sell order.)')
-            sign = 1
-        else:
-            # throw some kind of error
-            pass
-
-        instance.portfolio.cash += (sign * instance.price * instance.quantity)
-        instance.portfolio.save()'''
-
 @receiver(pre_save, sender= StockTransactRecord, dispatch_uid= 'stock_transaction_pre_save')
 def stock_transaction_pre_save(sender, instance, **kwargs):
-    #if order.feature_1 > some_threshold:
-    #   order.status = STATUS.under_review
-    #   broker.orders_to_review.append(order)
-    #elif order.feature_2 > some_other_threshold:
-    #   order.status = STATUS.under_review
-    #   broker.orders_to_review.append(order)
-    #elif ...
-    #else:
-    #   if order.value > portfolio.cash:
-    #       raise ValueError
+    '''
+                                              
+    '''
+    order = instance
+    strec = sender
+    
+    if strec.decision_table is None:
+        raise ValueError("Decision table not set!")
 
-    # only proceed if the order has not yet been processed
-    print('(Start processing of order.)')
-    if instance.order_status == StockTransactRecord.STATUS.processing.name:
-        print('(Order processing start.)')
-        if instance.order_type == StockTransactRecord.TRANSACTION_TYPE.buy.name:
-            print("(Processing buy order.)")
-            if instance.broker_review_requested:
-                print('(Buy order sent for manual review.)')
-                instance.order_status = StockTransactRecord.STATUS.under_review.name
-                # add order to broker's review list
-            else:
-                is_internal_order = instance.order_class == StockTransactRecord.TRANSACTION_CLASS.internal.name
-                is_undetermined_order = instance.order_class == StockTransactRecord.TRANSACTION_CLASS.undetermined.name
-                
-                if is_internal_order or is_undetermined_order:
-                    print('(Processing internal or undetermined order.)')
-                    tickers = [x[0] for x in company.user.portfolios.all()[0].stockinventory.all().values_list('ticker').distinct()]
-                    is_in_inventory = instance.ticker in tickers
-                    
-                    if is_in_inventory:
-                        print('(Requested stock is in internal inventory.)')
-                        # get number of shares in company inventory for this ticker
-                        shares_in_inventory = company.user.portfolios.all()[0].stockinventory.get(ticker= instance.ticker).quantity
-                        if instance.quantity <= shares_in_inventory :
-                            print('(Requested quantity is in internal inventory.)')
-                            instance.order_class = StockTransactRecord.TRANSACTION_CLASS.internal.name
-                            is_internal_share_proportion_ok = (instance.quantity/ shares_in_inventory) < stock_managment_settings['internal_share_proportion_threshold']
-                            is_internal_value_ok = (instance.price * instance.quantity) < stock_managment_settings['internal_value_threshold']
-                            if is_internal_share_proportion_ok and is_internal_value_ok:
-                                print('(Order passes internal checks, adding order to internal order aggregator)')
-                                instance.order_status = StockTransactRecord.STATUS.approved.name
-                                instance.message = 'Order within internal threholds and approved for execution.'
-                                # add order to internal order aggregator
-                            else:
-                                print('(Order fails internal checks, labelling for review.)')
-                                instance.order_status = StockTransactRecord.STATUS.under_review.name
-                                instance.mesage = 'Order under review for exceeding internal thresholds.'
-                                # add order to broker's review list
+    strec.decision_table.process_order(order)
 
-                            instance.save()
-                        else: # if requested purchase order quantity is over amount in inventory
-                            print('Order exceeds number of shares available internally, splitting order into internal and external order.')
-                            internal_quantity = shares_in_inventory
-                            external_quantity = instance.quantity - shares_in_inventory
-                            
-                            internal_order = StockTransactRecord(
-                                portfolio = instance.portfolio,
-                                order_type= instance.order_type,
-                                exchange_abbr= instance.exchange_abbr,
-                                ticker= instance.ticker,
-                                price= instance.price,
-                                order_placement_datetime= instance.order_placement_datetime,
-                                order_execution_datetime= instance.order_execution_datetime,
-                                quantity= internal_quantity,
-                                order_status= '',
-                                order_class= StockTransactRecord.TRANSACTION_CLASS.internal.name,
-                                broker_review_requested= False,
-                                message= 'This is the internally executable part of a split order.',
-                                order_part_of= instance
-                            )
-                            internal_order.save()
-
-                            external_order = StockTransactRecord(
-                                portfolio = instance.portfolio,
-                                order_type= instance.order_type,
-                                exchange_abbr= instance.exchange_abbr,
-                                ticker= instance.ticker,
-                                price= instance.price,
-                                order_placement_datetime= instance.order_placement_datetime,
-                                order_execution_datetime= instance.order_execution_datetime,
-                                quantity= internal_quantity,
-                                order_status= '',
-                                order_class= StockTransactRecord.TRANSACTION_CLASS.external.name,
-                                broker_review_requested= False,
-                                message= 'This is the externally executable part of a split order.',
-                                order_part_of= instance
-                            )
-                            external_order.save()
-
-                            instance.order_class = StockTransactRecord.TRANSACTION_CLASS.split.name
-                            instance.save()
-                    else: # if ticker isn't in inventory, change order class to external
-                        print('Requested stock isn\'t in internal inventory, creating external order.)')
-                        instance.order_class = StockTransactRecord.TRANSACTION_CLASS.external.name
-                        instance.save()
-                        
-                elif instance.order_class == StockTransactRecord.TRANSACTION_CLASS.external.name: # if order is external
-                    
-                    # need to add table with stock-specific info like shares outstanding
-                    # for now just assume that shares outstanding is 10000000 for each
-                    # stock
-                    is_external_share_proportion_ok = (instance.quantity/ 10000000) < stock_managment_settings['external_share_proportion_threshold']
-                    is_external_value_ok = (instance.price * instance.quantity) < stock_managment_settings['external_value_threshold']
-                    if is_external_share_proportion_ok and is_external_value_ok:
-                        print('(Order passes external checks, adding order to external order aggregator.)')
-                        instance.order_status = StockTransactRecord.STATUS.approved.name
-                        instance.message = 'Order within external thresholds and approved for execution.'
-                        # add order to external order aggregator
-                    else:
-                        print('(Order fails external checks, labelling for manual review.)')
-                        instance.order_status = StockTransactRecord.STATUS.under_review.name
-                        instance.message = 'Order under review for exceeding external thresholds.'
-                        # add order to broker's review list
-                    instance.save()
-                    # from table.models import StockTransactRecord, Portfolio
-                    # p = Portfolio.objects.get(name='first')
-                    # st = StockTransactRecord(portfolio= p, ticker= 'IBM', exchange_abbr= 'NYSE', order_type= 'buy', order_class= 'undetermined', price= 100, quantity= 100)
-                    # st.save()
-                    # 
-                elif instance.order_class == StockTransactRecord.TRANSACTION_CLASS.split.name:
-                    print('(This is a split order.)')
-
-        else:
-            print('(Sell function not supported yet)')
-    elif instance.order_status == StockTransactRecord.STATUS.approved.name:
-        sign = 0
-        if instance.order_type == StockTransactRecord.TRANSACTION_TYPE.buy.name:
-            print('(Taking cash from portfolio to cover buy order.)')
-            sign = -1
-        if instance.order_type == StockTransactRecord.TRANSACTION_TYPE.sell.name:
-            print('(Depositing cash from sell order.)')
-            sign = 1
-        else:
-            # throw some kind of error
-            pass
-
-        instance.portfolio.cash += (sign * instance.price * instance.quantity)
-        instance.portfolio.save()
+    # from table.models import StockTransactRecord, Portfolio
+    # p = Portfolio.objects.get(name='first')
+    # st = StockTransactRecord(portfolio= p, ticker= 'IBM', exchange_abbr= 'NYSE', order_type= 'buy', order_class= 'undetermined', price= 100, quantity= 100)
+    # st.save()
+    # 
 
 class StockInventory(Model):
     """
@@ -605,5 +470,3 @@ def portfolio_cash_transaction(sender, instance, **kwargs):
     else:
         # do some conversion into USD
         pass
-
-

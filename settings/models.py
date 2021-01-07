@@ -63,3 +63,22 @@ class StockManagementSettings(SingletonModel):
         decimal_places= 6,
         help_text= 'Fraction of order shares over externally held shares at which to halt processing of an external stock order'
     )
+    internal_short_share_threshold = models.IntegerField(
+        default= 1000,
+        help_text= 'The maximum allowable share deficit.'
+    )
+
+    def __str__(self):
+        return 'StockManagementSettings'
+
+    def does_pass_internal_checks(self, order, outstanding_shares=1000000):
+        return (
+            (order.price * order.quantity < self.internal_value_threshold) and 
+            (order.quantity / outstanding_shares < self.internal_share_proportion_threshold) 
+        )
+
+    def does_pass_external_checks(self, order, outstanding_shares):
+        return (
+            (order.price * order.quantity < self.external_value_threshold) and
+            (order.quantity / outstanding_shares < self.external_share_proportion_threshold) 
+        )
