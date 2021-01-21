@@ -44,3 +44,5 @@ Contributors names and contact info
 ## Acknowledgments
 
 * [DomPizzie](https://gist.github.com/DomPizzie/7a5ff55ffa9081f2de27c315f5018afc) - for the simple README template
+
+* [Simple is Better Than Complex](https://github.com/sibtc) - for the great tutorial series
