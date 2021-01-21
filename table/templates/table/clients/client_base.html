@@ -7,8 +7,7 @@
 
 {% block content %}
 {% get_portfolios user as portfolios %}
-<h1></h1>
-{% include './client_navbar.html' with portfolios=portfolios%}
+{% include './client_navbar.html' with portfolios=portfolios %}
 <div id="clientContent">
     {% block clientContent %}
     {% endblock %}

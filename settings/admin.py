@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import SiteSettings, StockManagementSettings
+from .models import SiteSettings, StockManagementSettings, CashManagementSettings
 from home.models import Company
 
 class SingletonModelAdmin(admin.ModelAdmin):
@@ -26,4 +26,8 @@ class StockManagementSettingsAdmin(SingletonModelAdmin):
 
 @admin.register(Company)
 class CompanyAdmin(SingletonModelAdmin):
+    pass
+
+@admin.register(CashManagementSettings)
+class CashManagementSettingsAdmin(SingletonModelAdmin):
     pass

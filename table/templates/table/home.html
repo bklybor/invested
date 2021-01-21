@@ -11,9 +11,9 @@
         {% include './clients/client_view.html' with portfolios=portfolios market_data=market_data%}
     {% elif user.is_broker %}
         {% include './brokers/broker_view.html'%}
-    {% else %}
-        {% include './guests/guest_view.html' %}
     {% endif %}
+{% else %}
+    {% include './guests/guest_overview.html' %}
 {% endif %}
 
 {% endblock %}

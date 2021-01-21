@@ -77,7 +77,8 @@ TEMPLATES = [
                 'django.contrib.messages.context_processors.messages',
                 'settings.context_processors.site_settings',
                 'settings.context_processors.stock_management_settings',
-                'settings.context_processors.company_settings'
+                'settings.context_processors.company_settings',
+                'settings.context_processors.cash_management_settings'
             ],
             'libraries':{
                 'templatetags': 'templatetags.tags',

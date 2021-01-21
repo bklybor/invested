@@ -1,8 +1,6 @@
-import pandas as pd
 from datetime import datetime
 import pytz
 from decimal import Decimal
-import pandas as pd
 import numpy as np
 
 from django.contrib import messages
@@ -20,19 +18,6 @@ from home.decorators import client_required
 from ..forms import PortfolioCreationForm
 from home.models import User, Client
 from ..models import Portfolio, StockTransactRecord, Stock
-
-pd.set_option('display.max_columns', None)
-
-'''@method_decorator([login_required, client_required], name= 'dispatch')
-class ClientHomeView(View):
-    model = Client
-    context_object_name = 'client_info'
-    template_name = 'table/clients/client_view.html'
-    queyset = Client.objects.all()
-
-    def get_queryset(self):
-        return Portfolio.objects.filter(owner= self.client_id)'''
-
 
 @method_decorator([login_required, client_required], name= 'dispatch')
 class ClientOverview(TemplateView):
@@ -64,9 +49,14 @@ class ClientPortfolioView(TemplateView):
 
         return portfolio
 
+    def get_available_tickers_with_prices(self):
+        return list(Stock.objects.all().values_list('ticker', flat= True).distinct())
+
     def get_context_data(self, **kwargs):
         context = super(ClientPortfolioView, self).get_context_data(**kwargs)
         context['portfolio'] = self.get_portfolio(context['portfolio_name'])
+        context['available_tickers'] = self.get_available_tickers()
+        context['show_new_transaction'] = False
         
         return context
 

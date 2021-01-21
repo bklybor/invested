@@ -82,3 +82,48 @@ class StockManagementSettings(SingletonModel):
             (order.price * order.quantity < self.external_value_threshold) and
             (order.quantity / outstanding_shares < self.external_share_proportion_threshold) 
         )
+
+class CashManagementSettings(SingletonModel):
+    client_one_external_deposit_max = models.DecimalField(
+        default= 10000,
+        max_digits= 18, 
+        decimal_places= 6,
+        help_text= 'Maximum amount in USD that a client can deposit into a portfolio at one time from an external source.'
+    )
+
+    client_one_external_deposit_min = models.DecimalField(
+        default= 100,
+        max_digits= 18, 
+        decimal_places= 6,
+        help_text= 'Minimum amount in USD that a client can deposit into a portfolio at one time from an external source'
+    )
+
+    client_total_deposit_max = models.DecimalField(
+        default= 1000000,
+        max_digits= 18, 
+        decimal_places= 6,
+        help_text= 'Maximum amount in USD that a client can have in a portfolio.'
+    )
+
+    client_total_deposit_min = models.DecimalField(
+        default= 1000,
+        max_digits= 18, 
+        decimal_places= 6,
+        help_text= 'Minimum amount in USD that a client can have in a portfolio.'
+    )
+
+    client_external_withdrawal_max = models.DecimalField(
+        default= 10000,
+        max_digits= 18, 
+        decimal_places= 6,
+        help_text= 'Maximum amount in USD that a client can freely withdraw from a portfolio to an external source'
+    )
+
+    client_external_withdrawal_time_period = models.DecimalField(
+        default= 1,
+        max_digits= 18, 
+        decimal_places= 6,
+        help_text= "Time period in days (24 hour days) over which to calculate the total amount  of withdrawals from a client's portfolio to an external source. The idea is that a client cannot freely withdraw more than the client_external_withdrawal_maximum within this time period without triggering a review by a broker."
+    )
+
+    

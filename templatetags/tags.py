@@ -21,9 +21,11 @@ def active_url(context, url):
 def get_portfolios(user):
     if user.is_client:
         print('(Fetching client portfolios.)')
-        return Portfolio.objects.filter(owner= Client.objects.get(client_id= user.client.client_id).user)
+        return Portfolio.objects.filter(owner= user) # Client.objects.get(client_id= user.client.client_id).user)
     elif user.is_broker:
         print('(Fetching broker portfolios.)')
+        return Portfolio.objects.filter(owner= user)
     elif user.is_company:
         print('(Fetching company portfolio.)')
+        return Portfolio.objects.filter(owner= user)
 

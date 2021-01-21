@@ -1,0 +1,10 @@
+{% extends './guest_base.html' %}
+{% load crispy_forms_tags %}
+{% csrf_token %}
+{% crispy form %}
+{% block guestContent %}
+{% load static %}
+
+    <h1>{{ marketing_message }}</h1>
+{% endblock%}
+

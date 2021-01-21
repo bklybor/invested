@@ -45,7 +45,7 @@ class Client(models.Model):
         ''''''
         portfolios = self.portfolios.all()
         for portfolio in portfolios:
-            portfolio.current_value = portfolio.get_value()
+            portfolio.current_value = portfolio.get_value_at_datetime()
         return portfolios
 
 class Broker(models.Model):

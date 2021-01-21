@@ -13,16 +13,7 @@ from django.dispatch import receiver
 from home.models import Client, Broker, User, Company
 from settings.models import SiteSettings, StockManagementSettings
 
-default_date = datetime.datetime(1,1,1,0,0,0, tzinfo=datetime.timezone.utc)
-decimal_places = 6
-date_format = '%Y-%m-%d %H:%M:%S'
-
 site_settings = SiteSettings.objects.all()[0]
-stock_management_settings = StockManagementSettings.objects.all()[0]
-
-company = Company.objects.all()[0]
-
-
 
 class Portfolio(Model):
     """A model representing a portfolio for a given client.
@@ -85,8 +76,9 @@ class Portfolio(Model):
         
         return [prices, quantities, values, types]
 
-    def get_value(self, date= datetime.datetime.now()):
-        """Get the value of this portfolio at a given datetime.
+    def get_value_at_datetime(self, date= datetime.datetime.now()):
+        """
+        Get the value of this portfolio at a given datetime.
         
         :param date: the date to calculate the value for, defaults to dateime.datetime.now()
         :type date: datetim.datetime, with tzinfo= datetime.timezone.utc
@@ -94,13 +86,14 @@ class Portfolio(Model):
         :return: monetary value of this portfolio on the given date in USD
         :rtype: Decimal
         """
+
         # total value of sell orders
         sell_value = self.stocktransactions \
         .annotate(value= ExpressionWrapper(F('price') * F('quantity'), output_field=DecimalField(max_digits= 20, decimal_places= site_settings.monetary_decimal_places))) \
         .filter(order_type= 'sell') \
         .aggregate(Sum('value'))
 
-        # total value of but orders
+        # total value of buy orders
         buy_value = self.stocktransactions \
         .annotate(value= ExpressionWrapper(F('price') * F('quantity'), output_field= DecimalField(max_digits= 20, decimal_places= site_settings.monetary_decimal_places))) \
         .filter(order_type= 'buy') \
@@ -153,7 +146,7 @@ class Stock(Model):
         :rtrype: Decimal
         """
         
-        date = pytz.utc.localize(datetime.datetime.strptime(date_and_time, date_format))
+        date = pytz.utc.localize(datetime.datetime.strptime(date_and_time, site_settings.db_date_format))
         print(date, ticker, exchange_abbr)
         try:
             return cls.objects.get(ticker= ticker, date= date, exchange_abbr= exchange_abbr).price
@@ -337,6 +330,9 @@ class StockTransactRecord(Model):
     def __str__(self):
         return str(self.timestamp)
 
+    def get_processing_attributes(self):
+        return self.order_type + ' ' + self.order_class + ' ' + self.order_status
+
     def get_id(self):
         return str(self._id.uuid4().hex)
 
@@ -347,7 +343,7 @@ class StockTransactRecord(Model):
     def get_value(self):
         return self.price * self.quantity
 
-@receiver(pre_save, sender= StockTransactRecord, dispatch_uid= 'stock_transaction_pre_save')
+@receiver(pre_save, sender= StockTransactRecord, dispatch_uid= 'stocktransaction_pre_save')
 def stock_transaction_pre_save(sender, instance, **kwargs):
     '''
                                               
@@ -359,12 +355,6 @@ def stock_transaction_pre_save(sender, instance, **kwargs):
         raise ValueError("Decision table not set!")
 
     strec.decision_table.process_order(order)
-
-    # from table.models import StockTransactRecord, Portfolio
-    # p = Portfolio.objects.get(name='first')
-    # st = StockTransactRecord(portfolio= p, ticker= 'IBM', exchange_abbr= 'NYSE', order_type= 'buy', order_class= 'undetermined', price= 100, quantity= 100)
-    # st.save()
-    # 
 
 class StockInventory(Model):
     """
@@ -391,6 +381,9 @@ class StockInventory(Model):
     ticker = CharField(max_length= 50, default= '', blank= True)
     quantity = PositiveIntegerField(default= 0, blank= True)
 
+    class Meta:
+        unique_together = ['portfolio', 'ticker']
+
     def __str__(self):
         return self.exchange_abbr + ' ' + self.ticker + ' ' + str(self.quantity)
 
@@ -398,9 +391,15 @@ class CashTransactionRecord(Model):
     """
     A Record of monetary transactions associtated with a give portfolio.
     """
+
+    # set in apps.py
+    decision_table = None
+
     class TRANSACTION_TYPE(Enum):
-        deposit = ('deposit', 'Cash deposit in to the associated Portfolio.')
-        withdrawal = ('withdrawal', 'Cash withdrawal from the associated Portfolio.')
+        external_deposit = ('external_deposit', 'Cash deposit in to the associated Portfolio from external source.')
+        external_withdrawal = ('external_withdrawal', 'Cash withdrawal from the associated Portfolio to external source.')
+        stock_buy_cover = ('internal_stock_buy_cover', 'Cash withdrawal from associated portfolio to cover the purchase of stock through this company.')
+        stock_sell_proceeds = ('stock_sell_proceeds', 'Cash deposit into the associated portfolio from the sale of stock through this company.')
 
         @classmethod
         def get_value(cls, member):
@@ -418,12 +417,29 @@ class CashTransactionRecord(Model):
         def get_value(cls, member):
             return cls[member].value[0]
 
+    class STATUS(Enum):
+        approved = ('approved', 'Order passes automatic checks.')
+        rejected = ('rejected', 'Order cannot be processed.')
+        processing = ('processing', 'Order is currently processing.')
+        under_review = ('under_review', 'Order is currently under review.')
+        completed = ('completed', 'Order has been completed')
+
+        @classmethod
+        def get_value(cls, member):
+            return cls[member].value[0]
+
     transaction_id = UUIDField(primary_key= True, default=uuid.uuid4, editable=False)
     portfolio = ForeignKey(
         Portfolio, 
         on_delete= CASCADE, 
         related_name= 'cashtransactions'
-    )                    
+    )
+    status = CharField(
+        max_length= 50, 
+        choices=[x.value for x in STATUS], 
+        default= STATUS.get_value('processing'), 
+        blank= True
+    )
     currency_type = CharField(
         max_length= 10, 
         choices=[x.value for x in CURRENCY_TYPE], 
@@ -436,37 +452,46 @@ class CashTransactionRecord(Model):
         default= 0, 
         blank= True
     )
+    amount_in_USD = DecimalField(
+        max_digits= 50, 
+        decimal_places= site_settings.monetary_decimal_places, 
+        default= 0, 
+        blank= True,
+        help_text= "amount of currency converted to USD"
+    )
     transaction_type = CharField(
-        max_length= 20, 
+        max_length= 50, 
         choices=[x.value for x in TRANSACTION_TYPE], 
-        default= TRANSACTION_TYPE.get_value('deposit'), 
+        default= TRANSACTION_TYPE.get_value('external_withdrawal'), 
         blank= True
     )
-    transaction_to = CharField(max_length= 50, default= '', blank= True)
-    transaction_from = CharField(max_length= 50, default= '', blank= True)
+    transaction_to = CharField(
+        max_length= 50, 
+        default= '', 
+        blank= True,
+        help_text= "The account number to which the transaction is directed.")
+    transaction_from = CharField(
+        max_length= 50, 
+        default= '', 
+        blank= True,
+        help_text= "The account number from which the transaction is directed.")
+    transaction_conditions = CharField(
+        max_length= 1000, 
+        default= '', 
+        blank= True,
+        help_text= "A json text file giving the conditions at time of failure. 0 if no failure.")
     transaction_datetime = DateTimeField(default= site_settings.db_default_date, blank=True)
 
-    def __str__(self):
-        return str(self.id)
-
 #---CashTransactionRecord Signals---#
-@receiver(post_save, sender= CashTransactionRecord, dispatch_uid= 'portfolio_cash_transaction')
+@receiver(pre_save, sender= CashTransactionRecord, dispatch_uid= 'portfolio_cash_transaction')
 def portfolio_cash_transaction(sender, instance, **kwargs):
     """
     Updates the cash amount in a portfolio after a cash deposit or withdrawal is sucessfully saved.
     """
-    sign = 0
-    if instance.transaction_type == CashTransactionRecord.TRANSACTION_TYPE.deposit.name:
-        sign = 1
-    elif instance.transaction_type == CashTransactionRecord.TRANSACTION_TYPE.withdrawal.name:
-        sign = -1
-    else:
-        # should throw some kind of error, or handle special cases, but pass for now
-        pass
-    
-    # if the currency type is USD, update cash, otherwise convert
-    if instance.currency_type == CashTransactionRecord.CURRENCY_TYPE.USD.name:
-        instance.portfolio.cash += (sign * instance.amount)
-    else:
-        # do some conversion into USD
-        pass
+    transaction = instance
+    ctrec = sender
+
+    if ctrec.decision_table is None:
+        raise ValueError("Decision table not set!")
+
+    ctrec.decision_table.process_transaction(transaction)

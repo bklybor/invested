@@ -23,8 +23,8 @@
           </li>
         {% endif %}
       {% else %}
-        <li class="nav-item {% active_url 'table:home'%}">
-          <a class="nav-link" href="{% url 'table:home' %}">Table <span class="sr-only">(current)</span></a>
+        <li class="nav-item {% active_url 'table:guest:guest_home_view'%}">
+          <a class="nav-link" href="{% url 'table:guest:guest_home_view' %}">Table <span class="sr-only">(current)</span></a>
         </li>
       {% endif %}      
         <li class="nav-item">

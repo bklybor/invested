@@ -10,13 +10,10 @@ class decision_table:
     2.) a dictionary of K 'actions' where each key is a code number for an action and each 
         value is the function that represents that action
     3.) a dictionary of C 'cases' where each member of the list is a dictionary that contains 
-        a.) "mask", a dictionary which specifies which conditions to evaluate 
-            for this case,
-        b.) "result", a dicionary which contains the results after applying the 
-            "mask" to the conditions
-        c.) "actions", a list of actions listed by their code number; these are the 
-            actions that execute when "result" results from applying the "mask" 
-            to the "conditions"
+        a.) "result", a dicionary which contains the results after calculating the condition 
+            functions
+        b.) "actions", a list of actions listed by their code number; these are the 
+            actions that execute when "result" is reached
             
     The structure:
     ```
@@ -40,12 +37,12 @@ class decision_table:
     
     cases = {
         0: {
-            "mask": {0: 1, 1: 0, ..., x <- self.conditions.keys(): y <- {1, 0}},
+            "name": "case0"
             "result": {0: 1, 1: 0, ..., x <- self.conditions.keys(): y <- {1, -1, 0}},
             "actions": [0,1, ..., x <- self.actions.keys()]
         },
         1: {
-            "mask": {0: 1, 1: 0, ..., x <- self.conditions.keys(): y <- {1, 0}},
+            "name": "case1"
             "result": {0: 1, 1: 0, ..., x <- self.conditions.keys(): y <- {1, -1, 0}},
             "actions": [0,1, ..., x <- self.actions.keys()]
         },
@@ -55,7 +52,7 @@ class decision_table:
            .
         
         C: {
-            "mask": {0: 1, 1: 0, ..., x <- self.conditions.keys(): y <- {1, 0}},
+            "name": "caseC"
             "result": {0: 1, 1: 0, ..., x <- self.conditions.keys(): y <- {1, -1, 0}},
             "actions": [0, 1, ..., x <- self.actions.keys()]
         }
@@ -94,7 +91,6 @@ class decision_table:
         self.conditions[new_key] = condition_function
         
         for case in self.cases:
-            case['mask'][new_key] = 0
             case['result'][new_key] = 0
     
     def add_action(self, action_function):
@@ -114,12 +110,9 @@ class decision_table:
         new_key = len(self.actions)
         self.actions[new_key] = action_function
             
-    def add_case(self, mask, result, actions):
+    def add_case(self, result, actions, name= "new_case"):
         """
         Adds a case to the decision table. A case must have a 'mask' that is unique among all other cases.
-        
-        :param mask: the boolean mask to apply to the conditions
-        :type mask: dict
         
         :param result: the result to get after applying the boolean mask to conditions
         :type result: dict
@@ -127,15 +120,16 @@ class decision_table:
         :param actions: the functions to call when the case is activated
         :type actions: list of callables
         """
+
+        if name == "new_case":
+            name = "case" + str(len(self.cases) - 1)
         
         # make sure case isn't already in decision table, only if there are cases to check
-        if mask in [v['mask'] for k, v in self.cases.items()]:
+        if result in [v['result'] for k, v in self.cases.items()]:
             raise ValueError("case already exists in this decision table")
             
-        if len(mask) != len(self.conditions):
-            raise ValueError("not enough entries in 'mask'")
-        if len(result) != len(self.conditions):
-            raise ValueError("not enough entries in 'result'")
+        #if len(result) != len(self.conditions):
+        #    raise ValueError("not enough entries in 'result'")
         if not actions:
             raise ValueError("need at least one action per case")
             
@@ -157,24 +151,7 @@ class decision_table:
                     coded_actions.append(k)
                 
             actions = coded_actions
-        
-        mask_all_callable = all(callable(condition) for condition in list(mask.keys()))
-        mask_all_non_callable = all(not callable(condition) for condition in list(mask.keys()))
-        
-        if not (mask_all_callable or mask_all_non_callable):
-            raise TypeError("keys in mask are either not all callable or not all non-callable")
-        
-        if mask_all_callable:
-            # check to make sure that all given condition functions exist in decision table already
-            if not set(list(self.conditions.values())) <= set(list(mask.keys())):
-                raise KeyError('one or more functions given in mask does not exist in self.conditions')
-            
-            coded_conditions = {}
 
-            for key in self.conditions.keys():
-                coded_conditions[key] = mask[self.conditions[key]]
-            mask = coded_conditions
-        
         result_all_callable = all(callable(condition) for condition in list(result.keys()))
         result_all_non_callable = all(not callable(condition) for condition in list(result.keys()))
         
@@ -183,18 +160,21 @@ class decision_table:
         
         if result_all_callable:
             # check to make sure that all given condition functions exist in decision table already
-            if not set(list(self.conditions.values())) <= set(list(result.keys())):
+            if not set(list(result.keys())) <= set(list(self.conditions.values())):
                 raise KeyError('one or more functions given in result does not exist in self.conditions')
             
             coded_conditions = {}
             
-            for key in self.conditions.keys():
-                coded_conditions[key] = result[self.conditions[key]]
+            for key, value in self.conditions.items():
+                if value in result.keys():
+                    coded_conditions[key] = result[value]
+                else:
+                    coded_conditions[key] = 0
             result = coded_conditions
         
         new_key = len(self.cases)
         self.cases[new_key] = {
-            'mask': mask,
+            'name': name,
             'result': result,
             'actions': actions
         }
@@ -204,8 +184,7 @@ class decision_table:
         Returns the actions to execute given the results of the conditions when given
         the aruments in condition_args. Condition arguments not given in condition_args are
         interpreted as 'don't care' and treated accordingly. All functions and their arguments 
-        must be given; which conditions to ignore should be given by the 'mask' for the case 
-        for an action. Arguments to condition functions must be given in order!
+        must be given; Arguments to condition functions must be given in order!
         
         :param condition_args: a dictionary for which each key is either a code number for a 
             condition function, or a condition function that itself is already a part of 
@@ -241,14 +220,6 @@ class decision_table:
                 coded_conditions[key] = condition_args[self.conditions[key]]
             condition_args = coded_conditions
             
-        # check to make sure number of arguments given for each function are correct
-        '''for key in list(self.conditions.keys()):
-            internal_args = self.conditions[key].__code__.co_varnames
-            given_args = condition_args[key]
-            if len(internal_args) != len(given_args):
-                raise ValueError('length of args for ' + str(self.conditions[key].__name__) + ' given as ' 
-                                 + str(len(given_args)) + '; should be ' + str(len(internal_args)))'''
-            
         requested_actions = []
         
         # for each case
@@ -257,16 +228,16 @@ class decision_table:
             # for each key (code number) in self.conditions
             for key in list(self.conditions.keys()):
                 # execute each condition function using the arguments given and store results
-                conditions[key] = self.to_one_neg_one(self.conditions[key](*condition_args[key]))
+                if case_info['result'][key] != 0:
+                    conditions[key] = self.to_one_neg_one(self.conditions[key](*condition_args[key]))
+                else:
+                    conditions[key] = 0
             
-            masked = {}
-            for key in list(self.conditions.keys()):
-                masked[key] = case_info['mask'][key] * conditions[key]
-            
-            print('case actions: ', [self.actions[x].__name__  for x in case_info['actions']])
-            print('case conditions: ', case_info['result'])
-            print('masked conditions: ', masked)
-            if masked == case_info['result']:
+            #print('case name: ', case_info['name'])
+            #print('case actions: ', [self.actions[x].__name__  for x in case_info['actions']])
+            #print('case conditions: \t', case_info['result'])
+            #print('current conditions: \t', conditions)
+            if conditions == case_info['result']:
                 actions = []
                 for action_code in case_info['actions']:
                     actions.append(self.actions[action_code])
